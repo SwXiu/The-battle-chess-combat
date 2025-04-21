@@ -8,7 +8,7 @@ public enum ChessPieceType
     Pawn = 1,
     Rook = 2,
     Knight = 3,
-    Bishop = 4,
+    Bishop= 4,
     Queen = 5,
     King = 6
 }
@@ -39,9 +39,7 @@ public class ChessPiece : MonoBehaviour
     public virtual List<Vector2Int> GetAvailableMove(ref ChessPiece[,] piece, int tileCountX, int tileCountY)
     {
         List<Vector2Int> r = new List<Vector2Int>();
-        r.Add(new Vector2Int(4, 4));
-        r.Add(new Vector2Int(4, 2));
-        r.Add(new Vector2Int(4, 1));
+
 
         return r;
     }
@@ -54,7 +52,7 @@ public class ChessPiece : MonoBehaviour
             transform.position = desiredPosition;
         }
     }
-
+    
     public virtual void SetScale(float scale, bool force = false)
     {
         desiredScale = defaultScale * scale;
@@ -64,5 +62,9 @@ public class ChessPiece : MonoBehaviour
         }
     }
 
+    public virtual SpecialMove GetSpecialMove(ref ChessPiece[,] chessPieces, ref List<Vector2Int[]> moveList, ref List<Vector2Int> availableMoves)
+    {
+        return SpecialMove.None;
+    }
 }
 

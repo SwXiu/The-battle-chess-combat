@@ -125,7 +125,6 @@ public class Chessboard : MonoBehaviour
                 currentlyDragging.SetPosition(point);
             }
         }
-
     }
 
     //Generaciones

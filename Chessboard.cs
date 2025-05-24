@@ -41,7 +41,6 @@ public class ChessBoard : MonoBehaviour
     private Vector2Int previousMove;
     private Vector3 bounds;
     private bool isWhiteTurn;
-    private bool isStartChangeCamera = false;
     private SpecialMove specialMove;
     private List<Vector2Int[]> moveList = new List<Vector2Int[]>();
     private int promotionX, promotionY, promotionTeam;
@@ -66,21 +65,34 @@ public class ChessBoard : MonoBehaviour
 
         RaycastHit info;
         Ray ray = currentCamera.ScreenPointToRay(Input.mousePosition);
-        if (Physics.Raycast(ray, out info, 100, LayerMask.GetMask("Tile", "Hover", "Highlight")))
+        if (Physics.Raycast(ray, out info, 100, LayerMask.GetMask("Tile", "Hover", "Highlight", "Check")))
         {
             Vector2Int hitPosition = LookupTileIndex(info.transform.gameObject);
 
             if (currentHover == -Vector2Int.one)
             {
                 currentHover = hitPosition;
-                tiles[hitPosition.x, hitPosition.y].layer = LayerMask.NameToLayer("Hover");
+                if (tiles[hitPosition.x, hitPosition.y].layer != LayerMask.NameToLayer("Check"))
+                {
+                    tiles[hitPosition.x, hitPosition.y].layer = LayerMask.NameToLayer("Hover");
+                }
             }
 
             if (currentHover != hitPosition)
             {
-                tiles[currentHover.x, currentHover.y].layer = (ContainsValidMove(availableMoves, currentHover)) ? LayerMask.NameToLayer("Highlight") : LayerMask.NameToLayer("Tile");
+                if (tiles[currentHover.x, currentHover.y].layer != LayerMask.NameToLayer("Check"))
+                {
+                    tiles[currentHover.x, currentHover.y].layer = (ContainsValidMove(availableMoves, currentHover))
+                        ? LayerMask.NameToLayer("Highlight")
+                        : LayerMask.NameToLayer("Tile");
+                }
+
                 currentHover = hitPosition;
-                tiles[hitPosition.x, hitPosition.y].layer = LayerMask.NameToLayer("Hover");
+
+                if (tiles[hitPosition.x, hitPosition.y].layer != LayerMask.NameToLayer("Check"))
+                {
+                    tiles[hitPosition.x, hitPosition.y].layer = LayerMask.NameToLayer("Hover");
+                }
             }
 
             if (Input.GetMouseButtonDown(0))
@@ -98,6 +110,7 @@ public class ChessBoard : MonoBehaviour
                         PreventCheck();
 
                         HighlightTiles();
+
                     }
                 }
             }
@@ -115,11 +128,45 @@ public class ChessBoard : MonoBehaviour
                 {
                     if (previousMove != -Vector2Int.one)
                     {
-                        tiles[previousMove.x, previousMove.y].layer = LayerMask.NameToLayer("Tile");
+                        if (tiles[previousMove.x, previousMove.y].layer != LayerMask.NameToLayer("Check"))
+                        {
+                            tiles[previousMove.x, previousMove.y].layer = LayerMask.NameToLayer("Tile");
+                        }
                     }
 
                     previousMove = previousPosition;
                     tiles[previousMove.x, previousMove.y].layer = LayerMask.NameToLayer("PreviousMove");
+
+                }
+
+                if (CheckForCheck())
+                {
+                    int targetTeam = isWhiteTurn ? 0 : 1;
+
+                    for (int x = 0; x < TILE_COUNT_X; x++)
+                    {
+                        for (int y = 0; y < TILE_COUNT_Y; y++)
+                        {
+                            if (chessPieces[x, y] != null && chessPieces[x, y].type == ChessPieceType.King && chessPieces[x, y].team == targetTeam)
+                            {
+                                tiles[x, y].layer = LayerMask.NameToLayer("Check");
+                                break;
+                            }
+                        }
+                    }
+                }
+                else
+                {
+                    for (int x = 0; x < TILE_COUNT_X; x++)
+                    {
+                        for (int y = 0; y < TILE_COUNT_Y; y++)
+                        {
+                            if (chessPieces[x, y] != null && chessPieces[x, y].type == ChessPieceType.King)
+                            {
+                                tiles[x, y].layer = LayerMask.NameToLayer("Tile");
+                            }
+                        }
+                    }
                 }
 
                 currentlyDragging = null;
@@ -130,7 +177,12 @@ public class ChessBoard : MonoBehaviour
         {
             if (currentHover != -Vector2Int.one)
             {
-                tiles[currentHover.x, currentHover.y].layer = (ContainsValidMove(availableMoves, currentHover)) ? LayerMask.NameToLayer("Highlight") : LayerMask.NameToLayer("Tile");
+                if (tiles[currentHover.x, currentHover.y].layer != LayerMask.NameToLayer("Check"))
+                {
+                    tiles[currentHover.x, currentHover.y].layer = (ContainsValidMove(availableMoves, currentHover))
+                        ? LayerMask.NameToLayer("Highlight")
+                        : LayerMask.NameToLayer("Tile");
+                }
                 currentHover = -Vector2Int.one;
             }
 
@@ -295,7 +347,7 @@ public class ChessBoard : MonoBehaviour
 
         availableMoves.Clear();
     }
-    
+
     //MOVIMIENTOS ESPECIALES
     private void ProcessSpecialMove()
     {
@@ -419,6 +471,7 @@ public class ChessBoard : MonoBehaviour
         PositionSinglePiece(x, y);
     }
 
+
     //JAQUE
     private void PreventCheck()
     {
@@ -517,10 +570,52 @@ public class ChessBoard : MonoBehaviour
         }
     }
 
+    private bool CheckForCheck()
+    {
+        // Verifica si hay movimientos en la lista
+        if (moveList.Count == 0)
+        {
+            return false; // No puede haber jaque si no hay movimientos
+        }
+
+        var lastMove = moveList[moveList.Count - 1];
+        int targetTeam = (chessPieces[lastMove[1].x, lastMove[1].y].team == 0) ? 1 : 0;
+
+        ChessPiece targetKing = null;
+        for (int x = 0; x < TILE_COUNT_X; x++)
+        {
+            for (int y = 0; y < TILE_COUNT_Y; y++)
+            {
+                if (chessPieces[x, y] != null && chessPieces[x, y].team == targetTeam && chessPieces[x, y].type == ChessPieceType.King)
+                {
+                    targetKing = chessPieces[x, y];
+                    break;
+                }
+            }
+        }
+
+        for (int x = 0; x < TILE_COUNT_X; x++)
+        {
+            for (int y = 0; y < TILE_COUNT_Y; y++)
+            {
+                if (chessPieces[x, y] != null && chessPieces[x, y].team != targetTeam)
+                {
+                    var moves = chessPieces[x, y].GetAvailableMove(ref chessPieces, TILE_COUNT_X, TILE_COUNT_Y);
+                    if (ContainsValidMove(moves, new Vector2Int(targetKing.currentX, targetKing.currentY)))
+                    {
+                        return true;
+                    }
+                }
+            }
+        }
+
+        return false;
+    }
+
     private bool CheckForCheckmate()
     {
         var lastMove = moveList[moveList.Count - 1];
-        int targetTeam = (chessPieces[lastMove[1].x, lastMove[1].y].team == 0) ? 1 : 0;
+        int targetTeam = (chessPieces[lastMove[1].x, lastMove[1].y].team == 0) ? 0 : 1;
 
         List<ChessPiece> attackingPiece = new List<ChessPiece>();
         List<ChessPiece> defendingPiece = new List<ChessPiece>();
@@ -568,9 +663,9 @@ public class ChessBoard : MonoBehaviour
                 {
                     return false;
                 }
-
-                return true;
             }
+
+            return true;
         }
 
         return false;
@@ -591,7 +686,7 @@ public class ChessBoard : MonoBehaviour
         }
         return -Vector2Int.one;
     }
-    private bool MoveTo(ChessPiece piece, int x, int y) //Funcion para mover una pieza
+    private bool MoveTo(ChessPiece piece, int x, int y)
     {
         if (!ContainsValidMove(availableMoves, new Vector2(x, y)))
         {
@@ -611,27 +706,16 @@ public class ChessBoard : MonoBehaviour
 
             if (ocp.team == 0)
             {
-                if (ocp.type == ChessPieceType.King)
-                {
-                    UnityEngine.Debug.Log("Black Wins");
-                }
-
                 deadWhitePieces.Add(ocp);
                 ocp.SetScale(deathSize);
                 ocp.SetPosition(new Vector3(8 * tileSize, yOffset * 1.5f, 8 * tileSize) - bounds + new Vector3(tileSize / 2, 0, tileSize / 2) + (Vector3.left * deathSpacing) * deadWhitePieces.Count);
             }
             else
             {
-                if (ocp.type == ChessPieceType.King)
-                {
-                    UnityEngine.Debug.Log("White Wins");
-                }
-
                 deadBlackPieces.Add(ocp);
                 ocp.SetScale(deathSize);
                 ocp.SetPosition(new Vector3(-1 * tileSize, yOffset * 1.5f, -1 * tileSize) - bounds + new Vector3(tileSize / 2, 0, tileSize / 2) + (Vector3.right * deathSpacing) * deadBlackPieces.Count);
             }
-
         }
 
         chessPieces[x, y] = piece;
@@ -639,16 +723,22 @@ public class ChessBoard : MonoBehaviour
 
         PositionSinglePiece(x, y);
 
-        isWhiteTurn = !isWhiteTurn;
-
         moveList.Add(new Vector2Int[] { previousPosition, new Vector2Int(x, y) });
 
         ProcessSpecialMove();
 
+        isWhiteTurn = !isWhiteTurn;
         if (CheckForCheckmate())
         {
-            //Saltar a la parte de combate
+            Debug.Log("¡Jaque mate!");
+            return true;
         }
+
+        if (CheckForCheck())
+        {
+            Debug.Log("¡Jaque!");
+        }
+
 
         return true;
     }
